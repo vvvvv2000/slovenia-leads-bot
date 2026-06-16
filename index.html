@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🇸🇮 Slovenia Lead Dashboard</title>
+<style>
+:root{--bg:#0f1117;--card:#1a1d27;--border:#2a2d3e;--text:#e2e8f0;
+  --muted:#718096;--accent:#6366f1}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif}
+header{background:linear-gradient(135deg,#1e1b4b,#312e81);padding:24px 32px;border-bottom:1px solid var(--border)}
+header h1{font-size:1.6rem;font-weight:700}
+header p{color:#a5b4fc;margin-top:4px;font-size:.9rem}
+.toolbar{display:flex;gap:12px;flex-wrap:wrap;padding:16px 32px;
+  border-bottom:1px solid var(--border);background:var(--card);align-items:center}
+.toolbar input,.toolbar select{background:var(--bg);color:var(--text);
+  border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:.85rem;outline:none}
+.toolbar input{width:260px}
+.toolbar input:focus,.toolbar select:focus{border-color:var(--accent)}
+.toolbar label{color:var(--muted);font-size:.8rem;margin-right:4px}
+.stats-bar{display:flex;gap:16px;padding:12px 32px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 16px;font-size:.8rem}
+.stat span{font-weight:700;font-size:1.1rem;display:block;color:var(--accent)}
+.grid{padding:24px 32px;display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;transition:border-color .2s}
+.card:hover{border-color:var(--accent)}
+.card.high{border-left:4px solid #ef4444}
+.card.medium{border-left:4px solid #f59e0b}
+.card.low{border-left:4px solid #10b981}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.card-name{font-weight:700;font-size:1rem;line-height:1.3}
+.card-score{background:var(--bg);border-radius:20px;padding:2px 10px;font-size:.75rem;font-weight:700;white-space:nowrap}
+.card-score.high{color:#ef4444;border:1px solid #ef444488}
+.card-score.medium{color:#f59e0b;border:1px solid #f59e0b88}
+.card-score.low{color:#10b981;border:1px solid #10b98188}
+.card-meta{margin-top:8px;font-size:.8rem;color:var(--muted)}
+.card-meta a{color:#6366f1;text-decoration:none}
+.card-meta a:hover{text-decoration:underline}
+.issues{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}
+.badge{font-size:.7rem;padding:3px 8px;border-radius:20px;border:1px solid;font-weight:600;white-space:nowrap}
+.pitch-box{margin-top:12px;background:var(--bg);border-radius:8px;padding:10px 12px;
+  font-size:.78rem;color:#a0aec0;line-height:1.5;border:1px solid var(--border);display:none}
+.card:hover .pitch-box{display:block}
+.empty{text-align:center;padding:60px;color:var(--muted);font-size:1.1rem}
+.export-btn{margin-left:auto;background:var(--accent);color:white;border:none;
+  border-radius:8px;padding:8px 16px;font-size:.85rem;cursor:pointer;font-weight:600}
+.export-btn:hover{opacity:.85}
+/* Login */
+#loginOverlay{position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);
+  display:flex;align-items:center;justify-content:center}
+.login-box{background:#1a1d27;border:1px solid #2a2d3e;border-radius:16px;
+  padding:40px 48px;width:340px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.login-box h2{color:#e2e8f0;font-size:1.3rem;margin-bottom:4px}
+.login-box p{color:#718096;font-size:.82rem;margin-bottom:28px}
+.login-box input{width:100%;padding:12px 16px;border-radius:10px;border:1px solid #2a2d3e;
+  background:#0f1117;color:#e2e8f0;font-size:.95rem;outline:none;margin-bottom:12px}
+.login-box input:focus{border-color:#6366f1}
+#loginErr{color:#ef4444;font-size:.8rem;min-height:18px;margin-bottom:10px}
+.login-box button{width:100%;padding:12px;border-radius:10px;border:none;
+  background:linear-gradient(135deg,#6366f1,#4f46e5);
+  color:white;font-size:.95rem;font-weight:700;cursor:pointer}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <div style="font-size:2.4rem;margin-bottom:8px">🇸🇮</div>
+    <h2>Leads Dashboard</h2>
+    <p>Slovenia Website Audit Tool</p>
+    <input id="pwInput" type="password" placeholder="Enter password"
+      onkeydown="if(event.key==='Enter')tryLogin()">
+    <div id="loginErr"></div>
+    <button onclick="tryLogin()">Sign In →</button>
+  </div>
+</div>
+
+<!-- MAIN UI -->
+<header>
+  <h1>🇸🇮 Slovenia Website Lead Dashboard</h1>
+  <p>Analiza spletnih strani slovenskih podjetij · prodajni pregled</p>
+</header>
+
+<div class="toolbar">
+  <div><label>Iskanje</label>
+    <input type="text" id="search" placeholder="Ime, naslov, spletna stran…" oninput="render()"></div>
+  <div><label>Filter</label>
+    <select id="issueFilter" onchange="render()">
+      <option value="">Vse težave</option>
+      <option value="no_website">🚫 Brez spletne strani</option>
+      <option value="no_ssl">🔓 Brez HTTPS</option>
+      <option value="free_domain">🆓 Brezplačna domena</option>
+      <option value="platform_wix">🏗️ Wix</option>
+      <option value="platform_godaddy">🏗️ GoDaddy</option>
+      <option value="platform_squarespace">🏗️ Squarespace</option>
+      <option value="platform_weebly">🏗️ Weebly</option>
+      <option value="platform_jimdo">🏗️ Jimdo</option>
+      <option value="no_mobile">📱 Ni mobil-friendly</option>
+      <option value="meta_missing">🔍 Ni SEO meta</option>
+    </select></div>
+  <div><label>Razvrsti</label>
+    <select id="sortBy" onchange="render()">
+      <option value="score">Težave (↓)</option>
+      <option value="name">Ime (A–Z)</option>
+    </select></div>
+  <div><label>Vir</label>
+    <select id="sourceFilter" onchange="render()">
+      <option value="">Vsi viri</option>
+      <option value="itis.siol.net">itis.siol.net</option>
+      <option value="bizi.si">bizi.si</option>
+      <option value="google_maps">Google Maps</option>
+    </select></div>
+  <button class="export-btn" onclick="exportCSV()">⬇️ Izvozi CSV</button>
+</div>
+
+<div class="stats-bar" id="statsBar"></div>
+<div class="grid" id="grid"></div>
+
+<script>
+/* ── DATA injected by build_dashboard.py ── */
+const DATA      = [];
+const ISSUE_META= {"no_website": {"label": "🚫 No website", "color": "#c0392b", "severity": 5}, "no_ssl": {"label": "🔓 No HTTPS", "color": "#e67e22", "severity": 3}, "free_domain": {"label": "🆓 Free/subdomain URL", "color": "#d35400", "severity": 4}, "platform_wix": {"label": "🏗️ Built on Wix", "color": "#8e44ad", "severity": 3}, "platform_godaddy": {"label": "🏗️ Built on GoDaddy", "color": "#8e44ad", "severity": 3}, "platform_squarespace": {"label": "🏗️ Built on Squarespace", "color": "#8e44ad", "severity": 2}, "platform_weebly": {"label": "🏗️ Built on Weebly", "color": "#8e44ad", "severity": 3}, "platform_jimdo": {"label": "🏗️ Built on Jimdo", "color": "#8e44ad", "severity": 3}, "platform_wordpress": {"label": "🏗️ WordPress.com", "color": "#8e44ad", "severity": 2}, "no_mobile": {"label": "📱 Not mobile-friendly", "color": "#16a085", "severity": 3}, "outdated_html": {"label": "⏳ Outdated HTML", "color": "#7f8c8d", "severity": 2}, "old_jquery": {"label": "⚙️ Old jQuery", "color": "#7f8c8d", "severity": 2}, "slow_response": {"label": "🐢 Slow server", "color": "#2980b9", "severity": 2}, "no_favicon": {"label": "🖼️ No favicon", "color": "#bdc3c7", "severity": 1}, "meta_missing": {"label": "🔍 No SEO meta", "color": "#95a5a6", "severity": 2}, "phone_not_on_site": {"label": "📞 Phone missing", "color": "#2c3e50", "severity": 2}};
+const PITCHES   = {"no_website": "Podjetje nima spletne strani — vsak dan izgublja stranke, ki iščejo po Googlu.", "no_ssl": "Stran deluje brez HTTPS — brskalniki opozarjajo 'Ni varno'. Google jo kaznuje v iskalniku.", "free_domain": "Spletni naslov je brezplačna poddomena (npr. podjetje.wixsite.com) — neprofesionalno in znižuje zaupanje.", "platform_wix": "Stran je na Wixu — omejena SEO, počasno nalaganje, ni lastniških pravic kode.", "platform_godaddy": "GoDaddy Website Builder: generični predlogi, slaba SEO, brez diferenciacije.", "platform_squarespace": "Squarespace: lepo videti, a omejeno SEO in ni prilagodljivosti za rast.", "platform_weebly": "Weebly: osnovno orodje brez resnih SEO možnosti.", "platform_jimdo": "Jimdo brezplačni plan prikazuje Jimdo oglaševanje in ima slabo SEO.", "platform_wordpress": "WordPress.com brezplačni plan prikazuje oglase tretjih strani.", "no_mobile": "Stran ni prilagojena za mobilne naprave — 60%+ prometa prihaja iz telefonov.", "outdated_html": "Zastarela HTML koda — signal za zanemarjeno stran, ki jo Google slabše uvršča.", "old_jquery": "Stara verzija jQuery z varnostnimi ranljivostmi.", "slow_response": "Stran se nalaga počasi (>3s) — Google to upošteva pri rangiranju.", "no_favicon": "Ni favicon ikone — videti kot nedokončana stran.", "meta_missing": "Ni meta opisa — Google ga generira naključno, kar zmanjšuje CTR v iskalniku.", "phone_not_on_site": "Telefonska številka ni navedena na spletni strani — težje vzpostaviti stik."};
+const PW_HASH   = 'b45438de6be52d4843917d64eae5fcfbe819b278e667b2efd993b0a29c118158';
+const SESSION_KEY = 'leads_auth';
+
+/* ── AUTH ── */
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function tryLogin() {
+  const hash = await sha256(document.getElementById('pwInput').value);
+  if (hash === PW_HASH) {
+    sessionStorage.setItem(SESSION_KEY, '1');
+    document.getElementById('loginOverlay').remove();
+  } else {
+    const el = document.getElementById('loginErr');
+    el.textContent = 'Incorrect password.';
+    document.getElementById('pwInput').value = '';
+    setTimeout(() => el.textContent = '', 3000);
+  }
+}
+if (sessionStorage.getItem(SESSION_KEY) === '1') {
+  document.getElementById('loginOverlay').remove();
+}
+
+/* ── DASHBOARD ── */
+function severity(issues) {
+  if (!issues || !issues.length) return 'low';
+  const scores = issues.map(i => (ISSUE_META[i] || {}).severity || 1);
+  const max = Math.max(...scores), total = scores.reduce((a,b) => a+b, 0);
+  return (max >= 4 || total >= 8) ? 'high' : (max >= 3 || total >= 4) ? 'medium' : 'low';
+}
+function scoreLabel(issues) {
+  if (!issues || !issues.length) return '✅ OK';
+  const sev = severity(issues);
+  const icon = sev === 'high' ? '🔴' : sev === 'medium' ? '🟡' : '🟢';
+  return icon + ' ' + issues.length + ' težav';
+}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function togglePitch(el) {
+  const box = el.previousElementSibling;
+  if (!box) return;
+  const open = box.style.display === 'block';
+  box.style.display = open ? 'none' : 'block';
+  el.textContent = (open ? '💬 Prodajni argument ▼' : '💬 Prodajni argument ▲');
+}
+
+function render() {
+  const q       = document.getElementById('search').value.toLowerCase();
+  const issueF  = document.getElementById('issueFilter').value;
+  const sortBy  = document.getElementById('sortBy').value;
+  const sourceF = document.getElementById('sourceFilter').value;
+
+  let items = DATA.filter(b => {
+    const issues = (b.audit || {}).issues || [];
+    if (q && ![b.name,b.address,b.website,b.phone,b.category,b.source].join(' ').toLowerCase().includes(q)) return false;
+    if (issueF && !issues.includes(issueF)) return false;
+    if (sourceF && (b.source||'google_maps') !== sourceF) return false;
+    return true;
+  });
+  if (sortBy === 'score') items.sort((a,b) => ((b.audit||{}).issues||[]).length - ((a.audit||{}).issues||[]).length);
+  else items.sort((a,b) => (a.name||'').localeCompare(b.name||'','sl'));
+
+  const total      = DATA.length;
+  const audited    = DATA.filter(b => b.audit).length;
+  const hasIssues  = DATA.filter(b => ((b.audit||{}).issues||[]).length > 0).length;
+  const noWeb      = DATA.filter(b => ((b.audit||{}).issues||[]).includes('no_website')).length;
+  document.getElementById('statsBar').innerHTML =
+    '<div class="stat"><span>' + total + '</span>skupaj</div>' +
+    '<div class="stat"><span>' + audited + '</span>pregledanih</div>' +
+    '<div class="stat"><span style="color:#ef4444">' + hasIssues + '</span>ima težave</div>' +
+    '<div class="stat"><span style="color:#e67e22">' + noWeb + '</span>brez strani</div>' +
+    '<div class="stat"><span>' + items.length + '</span>prikazanih</div>';
+
+  const grid = document.getElementById('grid');
+  if (!items.length) { grid.innerHTML = '<div class="empty">Ni rezultatov za ta filter.</div>'; return; }
+
+  grid.innerHTML = items.map(b => {
+    const issues = (b.audit || {}).issues || [];
+    const sev    = severity(issues);
+    const badges = issues.map(i => {
+      const m = ISSUE_META[i] || { label: i, color: '#888' };
+      return '<span class="badge" style="color:' + m.color + ';border-color:' + m.color + '44">' + m.label + '</span>';
+    }).join('');
+    const pitchLines = issues.filter(i => PITCHES[i]).slice(0,3).map(i => '• ' + PITCHES[i]).join('<br>');
+    const webDisplay = b.website
+      ? '<a href="' + esc(b.website) + '" target="_blank">' + esc(b.website.replace(/^https?:\/\//, '').slice(0,45)) + '</a>'
+      : '<span style="color:#ef4444">—</span>';
+    const srcBadge = b.source
+      ? '<span style="background:#1e1b4b;border-radius:4px;padding:1px 6px;font-size:.7rem">' + esc(b.source) + '</span>'
+      : '';
+    return '<div class="card ' + sev + '">'
+      + '<div class="card-header"><div class="card-name">' + esc(b.name||'—') + '</div>'
+      + '<div class="card-score ' + sev + '">' + scoreLabel(issues) + '</div></div>'
+      + '<div class="card-meta">' + webDisplay
+      + (b.phone ? ' · ' + esc(b.phone) : '')
+      + (b.address ? '<br>' + esc(b.address) : '')
+      + (b.category ? '<br><em>' + esc(b.category) + '</em>' : '')
+      + (srcBadge ? ' · ' + srcBadge : '') + '</div>'
+      + '<div class="issues">' + (badges || '<span style="color:#10b981;font-size:.8rem">✅ Ni težav</span>') + '</div>'
+      + (pitchLines ? '<div class="pitch-box">' + pitchLines + '</div>' : '')
+      + (pitchLines ? '<span style="font-size:.72rem;color:var(--accent);cursor:pointer;margin-top:8px;display:inline-block" onclick="togglePitch(this)">💬 Prodajni argument ▼</span>' : '')
+      + '</div>';
+  }).join('');
+}
+
+function exportCSV() {
+  const hdrs = ['Ime','Telefon','Naslov','Spletna stran','Vir','Težave','Kategorija'];
+  const rows = DATA.map(b => {
+    const iss = ((b.audit||{}).issues||[]).map(i => (ISSUE_META[i]||{}).label||i).join(' | ');
+    return [b.name,b.phone,b.address,b.website,b.source,iss,b.category]
+      .map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(',');
+  });
+  const csv = [hdrs.join(','), ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'leads_slovenija.csv';
+  a.click();
+}
+
+render();
+</script>
+</body>
+</html>
