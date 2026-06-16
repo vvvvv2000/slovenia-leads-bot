@@ -21,22 +21,22 @@ OUTPUT_HTML   = "dashboard.html"
 PASSWORD_HASH = "b45438de6be52d4843917d64eae5fcfbe819b278e667b2efd993b0a29c118158"
 
 ISSUE_META = {
-    "no_website":           {"label": "🚫 No website",           "color": "#c0392b", "severity": 5},
-    "no_ssl":               {"label": "🔓 No HTTPS",              "color": "#e67e22", "severity": 3},
-    "free_domain":          {"label": "🆓 Free/subdomain URL",    "color": "#d35400", "severity": 4},
-    "platform_wix":         {"label": "🏗️ Built on Wix",         "color": "#8e44ad", "severity": 3},
-    "platform_godaddy":     {"label": "🏗️ Built on GoDaddy",     "color": "#8e44ad", "severity": 3},
-    "platform_squarespace": {"label": "🏗️ Built on Squarespace", "color": "#8e44ad", "severity": 2},
-    "platform_weebly":      {"label": "🏗️ Built on Weebly",      "color": "#8e44ad", "severity": 3},
-    "platform_jimdo":       {"label": "🏗️ Built on Jimdo",       "color": "#8e44ad", "severity": 3},
-    "platform_wordpress":   {"label": "🏗️ WordPress.com",        "color": "#8e44ad", "severity": 2},
-    "no_mobile":            {"label": "📱 Not mobile-friendly",   "color": "#16a085", "severity": 3},
-    "outdated_html":        {"label": "⏳ Outdated HTML",         "color": "#7f8c8d", "severity": 2},
-    "old_jquery":           {"label": "⚙️ Old jQuery",           "color": "#7f8c8d", "severity": 2},
-    "slow_response":        {"label": "🐢 Slow server",           "color": "#2980b9", "severity": 2},
-    "no_favicon":           {"label": "🖼️ No favicon",           "color": "#bdc3c7", "severity": 1},
-    "meta_missing":         {"label": "🔍 No SEO meta",           "color": "#95a5a6", "severity": 2},
-    "phone_not_on_site":    {"label": "📞 Phone missing",         "color": "#2c3e50", "severity": 2},
+    "no_website":           {"label": "🚫 No website",           "color": "#ef4444", "sev": 5},
+    "no_ssl":               {"label": "🔓 No HTTPS",              "color": "#f97316", "sev": 3},
+    "free_domain":          {"label": "🆓 Free/subdomain URL",    "color": "#f59e0b", "sev": 4},
+    "platform_wix":         {"label": "🏗️ Built on Wix",         "color": "#a855f7", "sev": 3},
+    "platform_godaddy":     {"label": "🏗️ Built on GoDaddy",     "color": "#a855f7", "sev": 3},
+    "platform_squarespace": {"label": "🏗️ Built on Squarespace", "color": "#a855f7", "sev": 2},
+    "platform_weebly":      {"label": "🏗️ Built on Weebly",      "color": "#a855f7", "sev": 3},
+    "platform_jimdo":       {"label": "🏗️ Built on Jimdo",       "color": "#a855f7", "sev": 3},
+    "platform_wordpress":   {"label": "🏗️ WordPress.com",        "color": "#a855f7", "sev": 2},
+    "no_mobile":            {"label": "📱 Not mobile-friendly",   "color": "#14b8a6", "sev": 3},
+    "outdated_html":        {"label": "⏳ Outdated HTML",         "color": "#6b7280", "sev": 2},
+    "old_jquery":           {"label": "⚙️ Old jQuery",           "color": "#6b7280", "sev": 2},
+    "slow_response":        {"label": "🐢 Slow server",           "color": "#3b82f6", "sev": 2},
+    "no_favicon":           {"label": "🖼️ No favicon",           "color": "#9ca3af", "sev": 1},
+    "meta_missing":         {"label": "🔍 No SEO meta",           "color": "#9ca3af", "sev": 2},
+    "phone_not_on_site":    {"label": "📞 Phone missing",         "color": "#4b5563", "sev": 2},
 }
 
 SALES_PITCHES = {
@@ -71,9 +71,13 @@ def main():
     # Load data
     results_path = Path(RESULTS_FILE)
     if results_path.exists():
-        with open(results_path, encoding="utf-8") as f:
-            businesses = json.load(f)
-        print(f"Loaded {len(businesses)} businesses from {RESULTS_FILE}")
+        try:
+            with open(results_path, encoding="utf-8") as f:
+                businesses = json.load(f)
+            print(f"Loaded {len(businesses)} businesses from {RESULTS_FILE}")
+        except json.JSONDecodeError:
+            print(f"Warning: {RESULTS_FILE} is malformed — building empty dashboard.")
+            businesses = []
     else:
         print(f"No {RESULTS_FILE} found — building empty dashboard (run scrapers first).")
         businesses = []
