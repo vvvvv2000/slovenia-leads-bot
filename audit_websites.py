@@ -271,11 +271,15 @@ def audit_website(biz: dict) -> dict:
     audit_note = ""
 
     if not url:
-        issues.append("no_website")
+        source = biz.get("source", "")
+        # itis.siol.net listing pages don't include website URLs —
+        # absence of a URL here means "unknown", not "no website"
+        if source != "itis.siol.net":
+            issues.append("no_website")
         biz["audit"] = {
             "issues": issues,
             "platforms": [],
-            "audit_note": "No website listed on Google Maps.",
+            "audit_note": "No website URL found in directory." if source == "itis.siol.net" else "No website listed.",
             "raw_url": url,
         }
         return biz
