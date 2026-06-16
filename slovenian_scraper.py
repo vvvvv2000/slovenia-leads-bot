@@ -218,6 +218,8 @@ def itis_parse_business_page(html: str, url: str) -> dict:
     return info
 
 
+
+
 def scrape_itis(category=None, city=None, max_pages=5):
     """Scrape itis.siol.net for a given category or city."""
     results = []
@@ -243,7 +245,7 @@ def scrape_itis(category=None, city=None, max_pages=5):
         for i, biz in enumerate(listings):
             biz.setdefault("source", "itis.siol.net")
             biz.setdefault("maps_url", url)
-            print(f"    [{i+1}/{len(listings)}] {biz.get('name','?')[:50]}")
+            print(f"    [{i+1}/{len(listings)}] {biz.get('name','?')[:55]}")
             results.append(biz)
 
         time.sleep(random.uniform(1.0, 2.0))
