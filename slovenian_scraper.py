@@ -68,89 +68,99 @@ def itis_listing_url(category=None, city=None, page=1):
 
 
 def itis_parse_listing_page(html: str) -> list[dict]:
-    """Parse one itis results page → list of {name, phone, address, category, detail_url}."""
+    """Parse one itis results page → list of business dicts.
+
+    itis.siol.net is ASP.NET WebForms — business name links use __doPostBack,
+    so there are no plain <a href> links on the listing page for individual entries.
+    Instead we parse the page's full text, which is split into blocks by the
+    "Shrani" (Save) button that precedes every listing card.
+
+    Each block looks like:
+        [optional ad description]
+        BUSINESS NAME                         ← ALL CAPS
+        Gostilne in restavracije              ← category
+        TELEFON (prikaz vseh številk)         ← literal marker
+        041 220 815                           ← phone
+        EMAIL@DOMAIN.SI                       ← optional
+        Street name 5, City                   ← address street
+        1234 City                             ← postal code + city
+    """
     soup = BeautifulSoup(html, "html.parser")
+    full_text = soup.get_text("\n", strip=True)
+
     businesses = []
 
-    # Each business is inside a div that contains a bold name and a phone number
-    # Structure: div.result-list-item (or similar) with heading link
-    # The links to individual business pages look like: /BUSINESS-NAME?ID
-    for card in soup.select("div.result-list-item, div[class*='result']"):
-        biz = {}
+    # Split into blocks at "Shrani" — one block per listing card
+    blocks = re.split(r'\bShrani\b', full_text)
 
-        # Name + detail link
-        name_el = card.select_one("strong a, h2 a, .result-name a")
-        if name_el:
-            biz["name"] = name_el.get_text(strip=True)
-            href = name_el.get("href", "")
-            if href:
-                biz["detail_url"] = urljoin("https://itis.siol.net", href)
+    # blocks[0] = page header/nav; blocks[1:] = individual business cards
+    for block in blocks[1:]:
+        lines = [l.strip() for l in block.split("\n") if l.strip()]
+        if len(lines) < 2:
+            continue
 
-        # Phone — first visible phone number
-        phone_el = card.select_one("[class*='phone'], [class*='tel']")
-        if phone_el:
-            biz["phone"] = phone_el.get_text(strip=True)
+        biz = {"source": "itis.siol.net"}
 
-        # Address
-        addr_el = card.select_one("[class*='address'], [class*='addr']")
-        if addr_el:
-            biz["address"] = addr_el.get_text(strip=True)
+        # Find the "TELEFON" line — it separates name/category from contact info
+        telefon_idx = next(
+            (i for i, l in enumerate(lines) if "TELEFON" in l.upper()), -1
+        )
 
-        # Category
-        cat_el = card.select_one("[class*='category'], [class*='dejavnost']")
-        if cat_el:
-            biz["category"] = cat_el.get_text(strip=True)
+        if telefon_idx > 0:
+            pre = lines[:telefon_idx]
+            # Business names on itis are always ALL CAPS — prefer those over ad text
+            for line in pre:
+                stripped = line.strip()
+                if len(stripped) > 3 and stripped == stripped.upper() and re.search(r'[A-Z]', stripped):
+                    biz["name"] = stripped
+                    break
+            # Fallback: first line that doesn't look like an ad description
+            if not biz.get("name"):
+                for line in pre:
+                    if len(line) > 3 and not re.search(r'\bv\b|\bin\b|\bna\b|\biz\b|\bje\b', line, re.I):
+                        biz["name"] = line
+                        break
+            if not biz.get("name") and pre:
+                biz["name"] = pre[0]
+            # Category is typically the last line before TELEFON
+            if len(pre) >= 2:
+                biz["category"] = pre[-1]
+            post = lines[telefon_idx + 1:]
+        else:
+            # No TELEFON marker — skip (likely not a real listing block)
+            continue
 
-        if biz.get("name"):
+        # ── Phone ──────────────────────────────────────────────────────
+        for line in post:
+            # Slovenian numbers: 01 234 56 78 / 041 220 815 / +386 41 ...
+            if re.match(r'^[\+\d][\d\s]{5,}$', line):
+                biz["phone"] = re.sub(r'\s+', ' ', line).strip()
+                break
+
+        # ── Email ──────────────────────────────────────────────────────
+        post_text = " ".join(post)
+        em = re.search(r'[\w.+\-]+@[\w\-]+\.[A-Za-z]{2,}', post_text)
+        if em:
+            biz["email"] = em.group(0)
+
+        # ── Address ────────────────────────────────────────────────────
+        # Look for a 4-digit Slovenian postal code line
+        for i, line in enumerate(post):
+            if re.match(r'^\d{4}\s+\S', line):
+                street = post[i - 1] if i > 0 else ""
+                # Don't use phone or category as street
+                if (street and street != biz.get("phone", "")
+                        and not re.match(r'^[\d\s\+]{6,}$', street)):
+                    biz["address"] = f"{street}, {line}"
+                else:
+                    biz["address"] = line
+                break
+
+        if biz.get("name") and len(biz["name"]) > 3:
+            # Stop at pagination markers
+            if biz["name"] in ("Naprej", "Nazaj", "Zacetek", "Konec"):
+                continue
             businesses.append(biz)
-
-    # Fallback: if the CSS selectors above don't match, try a text-based parse
-    if not businesses:
-        businesses = itis_parse_listing_fallback(soup)
-
-    return businesses
-
-
-def itis_parse_listing_fallback(soup: BeautifulSoup) -> list[dict]:
-    """Fallback parser: extract business cards by looking for phone patterns."""
-    businesses = []
-
-    # itis renders each entry in a block with the name as a bold anchor
-    # and the phone in a span. We'll look for anchors that link to business pages.
-    for link in soup.select('a[href*="?"]'):
-        href = link.get("href", "")
-        # Business pages have numeric IDs like /BUSINESS-NAME?12345678
-        if not re.search(r'\?\d{5,}$', href):
-            continue
-        name = link.get_text(strip=True)
-        if not name or len(name) < 3:
-            continue
-
-        parent = link.find_parent()
-        if not parent:
-            continue
-
-        # Walk up to find the enclosing card
-        card_text = ""
-        el = parent
-        for _ in range(5):
-            if el is None:
-                break
-            card_text = el.get_text(" ", strip=True)
-            # A card usually contains at least a phone-like pattern
-            if re.search(r'\d{2}\s*\d{3}\s*\d{2}', card_text):
-                break
-            el = el.find_parent()
-
-        # Extract phone
-        phone_match = re.search(r'(?:0[1-9]\d[\s\d]{6,})', card_text)
-        phone = phone_match.group(0).strip() if phone_match else ""
-
-        businesses.append({
-            "name": name,
-            "phone": phone,
-            "detail_url": urljoin("https://itis.siol.net", href),
-        })
 
     return businesses
 
@@ -228,26 +238,13 @@ def scrape_itis(category=None, city=None, max_pages=5):
             print(f"  No listings found on page {page} — stopping.")
             break
 
-        print(f"  Found {len(listings)} listings on page {page}. Fetching details...")
+        print(f"  Found {len(listings)} listings on page {page}.")
 
         for i, biz in enumerate(listings):
-            detail_url = biz.pop("detail_url", "")
-            if detail_url:
-                try:
-                    detail_resp = SESSION.get(detail_url, timeout=12)
-                    extra = itis_parse_business_page(detail_resp.text, detail_url)
-                    biz.update({k: v for k, v in extra.items() if v and not biz.get(k)})
-                    biz["source"] = "itis.siol.net"
-                    biz["maps_url"] = detail_url
-                except Exception as e:
-                    print(f"    [detail error] {biz.get('name', '?')} — {e}")
-            else:
-                biz["source"] = "itis.siol.net"
-                biz["maps_url"] = url
-
-            print(f"    [{i+1}/{len(listings)}] {biz.get('name','?')[:40]} | {biz.get('website','—')[:40]}")
+            biz.setdefault("source", "itis.siol.net")
+            biz.setdefault("maps_url", url)
+            print(f"    [{i+1}/{len(listings)}] {biz.get('name','?')[:50]}")
             results.append(biz)
-            time.sleep(random.uniform(0.6, 1.2))
 
         time.sleep(random.uniform(1.0, 2.0))
 
@@ -373,7 +370,7 @@ def main():
         )
     elif args.source == "bizi":
         if not args.query:
-            print("⚠️  Provide --query for bizi source. Example: --query 'restavracija'")
+            print("Provide --query for bizi source. Example: --query restavracija")
             return
         data = scrape_bizi(query=args.query, max_pages=args.pages)
     else:
